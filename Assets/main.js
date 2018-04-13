@@ -1,14 +1,16 @@
 var conn = new WebSocket('ws://localhost:9000');
-var chatBox, username = false, item = {}, user = {}, dirty = false;
+var chatBox, username = false, item = {}, user = {}, dirty = false, user_id = null;
 
 conn.onopen = function(e) {
     console.log("Connection established!");
 };
 
 conn.onmessage = function(e) {
-	console.log(e);
+        console.log(data);
+
 		var data =  JSON.parse(e.data),
 	    userChat = $(".user-chat");
+
 	    if(data.type == "send")
 	    	chatBox.append(appendUserData(data.message, data.username));
 	    else if(data.type=="onliners"){
@@ -24,7 +26,8 @@ conn.onmessage = function(e) {
 
 $(document).ready(function(){
 	chatBox = $("ul.chat");
-
+	if(localStorage.getItem("user_id"))
+		user_id = localStorage.getItem("user_id");
 	/**
 	* Hide send button and options button if username is not set
 	**/
@@ -45,8 +48,11 @@ $(document).ready(function(){
         chatDiv = $(document).find(".my-chat");
         item["username"] = localStorage.getItem("username");
         item["message"] = form.find(".chat-message").val();
-      //  item["to"] = 90;
+        item["to"] = "12";
         item["type"] = "send";
+        item["user_id"] = user_id;
+        
+        console.log(item);
         conn.send(JSON.stringify(item));
         chatBox.append(appendMyData(item["message"], localStorage.getItem("username")));
         form.find("#btn-input").val("");
@@ -56,11 +62,11 @@ $(document).ready(function(){
     /**
     * Function to save username
     **/ 
-    $(document).find("#btn-username").on("click", function() {
+    $(document).find("#btn-username").on("click", function(e) {
+    	e.preventDefault();
     	var username = $("#txt-username").val();
     	if(username) {
 	    	localStorage.setItem("username", username);
-        	user["user_id"] = Math.floor(Math.random()*(50-1+1)+1);
 	    	user["username"] = username;
 	    	user["type"] = "register";
 	    	$.ajax( {
@@ -68,17 +74,28 @@ $(document).ready(function(){
 	    		data: {username:username},
 	    		type: "POST",
 	    		success: function (e) {
-	    			console.log(e);
+	    			var response = JSON.parse(e);
+	    			if(response.status){
+	    				localStorage.setItem("user_id",response.data);
+	    				alert("success!");
+    					setTimeout(function(){ 
+    						location.reload();
+    					 }, 500);
+	    			}
+	    			else
+	    				alert("We are not able to register your account");
+
 	    		},
 	    		error: function(e) {
-	    			console.log(e);
+	    				alert("Something went wrong on server end");
 	    		}
 
-	    	});
-	    	conn.send(JSON.stringify(user));
-	    	if(localStorage.getItem("username")) {
-	    		//location.reload();
-	    	}
+	    	});	
+	    	setTimeout(function() {
+	    		user["user_id"] = localStorage.getItem("user_id");
+		    	conn.send(JSON.stringify(user));
+	    	}, 800);
+    		
 	    }
     });
 
@@ -93,13 +110,14 @@ $(document).ready(function(){
     /**
     * Logout current use
     **/
-    $(document).find("#signout-btn").on("click", function() {
-    	if(localStorage.getItem("username")) {
+    $(document).find("#signout-btn").on("click", function(e) {
+    	e.preventDefault();
+    	if(localStorage.getItem("username") && (localStorage.getItem("user_id"))) {
     		localStorage.removeItem("username");
+    		localStorage.removeItem("user_id");
     		location.reload();
     	}
     });
-
 
     /**
     * Function to show online users
@@ -109,6 +127,7 @@ $(document).ready(function(){
     	request["type"] = "online";
     	conn.send(JSON.stringify(request));
     });
+
     /**
     * Function to list online Users
     **/
@@ -179,9 +198,3 @@ function removeAllBlankOrNull(JsonObj) {
     return JsonObj;
 }
 
-/**
-* Subscribe for one to one chat
-**/
-function subscribe(channel) {
-    conn.send(JSON.stringify({type: "subscribe", channel: channel}));
-}

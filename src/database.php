@@ -11,15 +11,27 @@ $conn = new mysqli($servername, $username, $password, $database);
 if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 } 
-else
-	echo "Connected";
 
 if(!empty($_POST["username"])) {
-	$query = "INSERT INTO `users` (username, create_at) VALUES ($_POST['username'], 'time()')";
-	if($conn->query($query)) {
-		echo "User Created";
+	$username =  $_POST["username"];
+	$created_at = date('Y-m-d H:i:s');
+	$prev = "SELECT * FROM users WHERE username='$username'";
+	$result = $conn->query($prev);
+	$user_id = false;
+	if($result->num_rows > 0) {
+		while($row = $result->fetch_assoc()) {
+			$user_id = $row["id"];
+		}
+		echo json_encode(array("status"=>true, "data"=>$user_id));
+		exit;
 	}
-	else
-		echo "Error in creating user";
+	else {
+		$new = "INSERT INTO `users` (username, create_at) VALUES ('$username', '$created_at')";
+		if($conn->query($new)) {
+			echo json_encode(array("status" => true, "data"=>$conn->insert_id));
+		}
+		else
+			echo json_encode(array("status" => false));
+	}
 }
 ?>
